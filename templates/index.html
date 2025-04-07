@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신문 기사 수집기 pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+        }
+        
+        .app-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .app-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .app-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #eee;
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .progress-container {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .progress {
+            height: 0.8rem;
+            border-radius: 0.4rem;
+            background-color: #e9ecef;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .progress-status {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        
+        .result-section {
+            margin-top: 2rem;
+            display: none;
+        }
+        
+        .newspaper-section {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .newspaper-title {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+        }
+        
+        .newspaper-title i {
+            margin-right: 0.5rem;
+        }
+        
+        .article-item {
+            margin-bottom: 0.75rem;
+            text-decoration: none;
+            color: #333;
+            display: block;
+            padding: 0.5rem;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .article-item:hover {
+            background-color: #f8f9fa;
+            color: #1e3c72;
+            transform: translateX(5px);
+        }
+        
+        .newspaper-checkbox {
+            margin-right: 0.5rem;
+        }
+        
+        .newspaper-group {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            height: 100%;
+        }
+        
+        .newspaper-group-title {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+        }
+        
+        .newspaper-group-title i {
+            margin-right: 0.25rem;
+            font-size: 1.1rem;
+        }
+        
+        .newspaper-group-title-text {
+            margin-left: 0.25rem;
+        }
+        
+        .form-check {
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-check-label {
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border: none;
+            padding: 0.75rem 2rem;
+            font-weight: 500;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-select {
+            border-radius: 5px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+        }
+        
+        .form-label {
+            font-weight: 500;
+            color: #1e3c72;
+        }
+        
+        .result-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e3c72;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .result-title i {
+            margin-right: 0.5rem;
+        }
+        
+        .result-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-outline-primary {
+            color: #1e3c72;
+            border-color: #1e3c72;
+            background-color: transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: #1e3c72;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .select-all-checkbox {
+            margin-right: 0.5rem;
+        }
+        
+        .newspaper-container {
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        .newspaper-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .newspaper-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .newspaper-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .newspaper-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 300px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .toast-success {
+            border-left: 4px solid #28a745;
+        }
+        
+        .toast-error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .toast-message {
+            flex-grow: 1;
+        }
+        
+        .toast-close {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0;
+            margin-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="app-header text-center">
+            <h1 class="app-title">신문 기사 수집기 pro</h1>
+            <p class="app-subtitle">오늘의 주요 신문 기사를 한눈에 모아보세요</p>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-newspaper"></i> 신문사 선택
+            </div>
+            <div class="card-body">
+                <form id="crawlForm">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="newspaper-group">
+                                <div class="newspaper-group-title">
+                                    <i class="bi bi-graph-up"></i><span class="newspaper-group-title-text">경제 신문</span>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input select-all-checkbox" type="checkbox" 
+                                           id="selectAllEconomic" data-group="economic">
+                                    <label class="form-check-label" for="selectAllEconomic">
+                                        전체 선택
+                                    </label>
+                                </div>
+                                <div class="newspaper-container" id="economicPapers"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="newspaper-group">
+                                <div class="newspaper-group-title">
+                                    <i class="bi bi-globe"></i><span class="newspaper-group-title-text">종합일간지(조간)</span>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input select-all-checkbox" type="checkbox" 
+                                           id="selectAllGeneral" data-group="general">
+                                    <label class="form-check-label" for="selectAllGeneral">
+                                        전체 선택
+                                    </label>
+                                </div>
+                                <div class="newspaper-container" id="generalPapers"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="newspaper-group">
+                                <div class="newspaper-group-title">
+                                    <i class="bi bi-moon"></i><span class="newspaper-group-title-text">석간 신문</span>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input select-all-checkbox" type="checkbox" 
+                                           id="selectAllEvening" data-group="evening">
+                                    <label class="form-check-label" for="selectAllEvening">
+                                        전체 선택
+                                    </label>
+                                </div>
+                                <div class="newspaper-container" id="eveningPapers"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 mt-4">
+                        <label for="scope" class="form-label">
+                            <i class="bi bi-search"></i> 수집 범위
+                        </label>
+                        <select class="form-select" id="scope" name="scope" required>
+                            <option value="전체">전체 기사</option>
+                            <option value="1면">1면 기사만</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-play-fill"></i> 크롤링 시작
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">크롤링 중입니다...</p>
+            
+            <div class="progress-container">
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="crawlProgress"></div>
+                </div>
+                <div class="progress-status" id="progressStatus">크롤링 준비 중...</div>
+            </div>
+        </div>
+
+        <div class="result-section">
+            <div class="result-title">
+                <div>
+                    <i class="bi bi-newspaper"></i> 📰 오늘의 신문 기사 모음
+                </div>
+                <div class="result-actions">
+                    <button class="btn btn-outline-primary" id="copyResults">
+                        <i class="bi bi-clipboard"></i> 복사
+                    </button>
+                    <button class="btn btn-outline-primary" id="saveResults">
+                        <i class="bi bi-download"></i> 저장
+                    </button>
+                </div>
+            </div>
+            <div id="articlesList"></div>
+        </div>
+    </div>
+    
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // Initialize newspaper checkboxes
+        const newspaperGroups = {
+            economic: JSON.parse('{{ newspaper_groups.economic|tojson|safe }}'),
+            general: JSON.parse('{{ newspaper_groups.general|tojson|safe }}'),
+            evening: JSON.parse('{{ newspaper_groups.evening|tojson|safe }}')
+        };
+
+        function createNewspaperCheckboxes(group, containerId) {
+            const container = document.getElementById(containerId);
+            newspaperGroups[group].forEach(([name, _]) => {
+                const div = document.createElement('div');
+                div.className = 'form-check';
+                div.innerHTML = `
+                    <input class="form-check-input newspaper-checkbox" type="checkbox" 
+                           name="newspapers" value="${name}" id="${name}" data-group="${group}">
+                    <label class="form-check-label" for="${name}">
+                        ${name}
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Create checkboxes for each group
+        createNewspaperCheckboxes('economic', 'economicPapers');
+        createNewspaperCheckboxes('general', 'generalPapers');
+        createNewspaperCheckboxes('evening', 'eveningPapers');
+
+        // Handle "Select All" checkboxes
+        document.querySelectorAll('.select-all-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const group = this.dataset.group;
+                const isChecked = this.checked;
+                document.querySelectorAll(`input[name="newspapers"][data-group="${group}"]`)
+                    .forEach(item => item.checked = isChecked);
+            });
+        });
+
+        // Update "Select All" checkbox state when individual checkboxes change
+        document.querySelectorAll('.newspaper-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const group = this.dataset.group;
+                const groupCheckboxes = document.querySelectorAll(`input[name="newspapers"][data-group="${group}"]`);
+                const allChecked = Array.from(groupCheckboxes).every(item => item.checked);
+                document.querySelector(`#selectAll${group.charAt(0).toUpperCase() + group.slice(1)}`).checked = allChecked;
+            });
+        });
+        
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            toast.innerHTML = `
+                <div class="toast-message">${message}</div>
+                <button class="toast-close">&times;</button>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Show the toast
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // Add event listener to close button
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toastContainer.removeChild(toast);
+                }, 300);
+            });
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentNode === toastContainer) {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (toast.parentNode === toastContainer) {
+                            toastContainer.removeChild(toast);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+        
+        // Copy results to clipboard
+        document.getElementById('copyResults').addEventListener('click', function() {
+            const articlesList = document.getElementById('articlesList');
+            const textToCopy = formatResultsForCopy(articlesList.innerHTML);
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast('결과가 클립보드에 복사되었습니다.');
+            }).catch(err => {
+                showToast('복사 중 오류가 발생했습니다.', 'error');
+                console.error('복사 중 오류:', err);
+            });
+        });
+        
+        // Save results to file
+        document.getElementById('saveResults').addEventListener('click', function() {
+            const articlesList = document.getElementById('articlesList');
+            const textToSave = formatResultsForCopy(articlesList.innerHTML);
+            
+            const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `신문기사_${new Date().toISOString().slice(0, 10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('결과가 파일로 저장되었습니다.');
+        });
+        
+        // Format HTML results for text copy/save
+        function formatResultsForCopy(html) {
+            // Create a temporary div to parse the HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            let result = "📰 오늘의 신문 기사 모음\n\n";
+            
+            // Process each newspaper section
+            const sections = tempDiv.querySelectorAll('.newspaper-section');
+            sections.forEach(section => {
+                const title = section.querySelector('.newspaper-title').textContent.trim();
+                result += `${title}\n`;
+                
+                const articles = section.querySelectorAll('.article-item');
+                articles.forEach(article => {
+                    // Remove the icon and get only the text content
+                    const title = article.textContent.replace('🔹', '').trim();
+                    result += `🔹 ${title}\n`;
+                });
+                
+                result += "\n";
+            });
+            
+            return result;
+        }
+
+        document.getElementById('crawlForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loading = document.querySelector('.loading');
+            const resultSection = document.querySelector('.result-section');
+            const articlesList = document.getElementById('articlesList');
+            const progressBar = document.getElementById('crawlProgress');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            // Get selected newspapers
+            const selectedNewspapers = Array.from(document.querySelectorAll('input[name="newspapers"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            if (selectedNewspapers.length === 0) {
+                alert('최소 하나 이상의 신문사를 선택해주세요.');
+                return;
+            }
+            
+            loading.style.display = 'block';
+            resultSection.style.display = 'none';
+            articlesList.innerHTML = '';
+            
+            // Reset progress
+            progressBar.style.width = '0%';
+            progressBar.setAttribute('aria-valuenow', 0);
+            progressStatus.textContent = '크롤링 준비 중...';
+            
+            const formData = new FormData(e.target);
+            formData.append('selected_newspapers', JSON.stringify(selectedNewspapers));
+            
+            try {
+                // Start progress simulation
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    if (progress < 90) {
+                        progress += Math.random() * 5;
+                        if (progress > 90) progress = 90;
+                        progressBar.style.width = `${progress}%`;
+                        progressBar.setAttribute('aria-valuenow', progress);
+                        progressStatus.textContent = `크롤링 중... ${Math.round(progress)}%`;
+                    }
+                }, 500);
+                
+                const response = await fetch('/crawl', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Complete progress
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
+                progressStatus.textContent = '크롤링 완료!';
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                let html = '';
+                for (const [newspaper, articles] of Object.entries(data.articles)) {
+                    html += `
+                        <div class="newspaper-section">
+                            <div class="newspaper-title">
+                                <i class="bi bi-bookmark-fill"></i> 📌 [${newspaper}]
+                            </div>
+                            ${articles.map(([title, link]) => `
+                                <a href="${link}" target="_blank" class="article-item">
+                                    <i class="bi bi-arrow-right-short"></i> 🔹 ${title}
+                                </a>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                articlesList.innerHTML = html;
+                resultSection.style.display = 'block';
+                
+            } catch (error) {
+                alert('크롤링 중 오류가 발생했습니다.');
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html> 
