@@ -3,23 +3,24 @@ import datetime
 import random # 랜덤 지연 위해 추가
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By # By 임포트 확인
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException # NoSuchElementException 임포트 확인
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 import time
 
-# --- 기사 수집 로직 (중복 제거 위해 별도 함수로 분리) ---
-def _collect_articles_from_elements(elements, article_class_pattern, articles_set):
+# --- 기사 수집 로직 (수정: 순서 유지를 위해 list 사용 및 중복 제거 로직 변경) ---
+def _collect_articles_from_elements(elements, article_class_pattern, articles_list_ref, seen_hrefs_ref):
     """
-    주어진 웹 요소 리스트에서 조건에 맞는 기사(제목, 링크)를 찾아 set에 추가합니다.
-    페이지 정보를 <dt> 또는 <dd> 태그에서 찾아 제목에 추가합니다. (제공된 HTML 예시 기반으로 XPath 수정)
+    주어진 웹 요소 리스트에서 조건에 맞는 기사(제목, 링크)를 찾아 list에 순서대로 추가합니다.
+    seen_hrefs_ref set을 사용하여 중복된 기사(href 기준)는 추가하지 않습니다.
+    페이지 정보를 <dt> 또는 <dd> 태그에서 찾아 제목에 추가합니다.
     """
     collected_count = 0
     for article_element in elements: # article_element는 일반적으로 <a> 태그입니다.
         try:
-            # 클래스 속성 필터링 (기존 로직 유지)
+            # 클래스 속성 필터링
             class_string = article_element.get_attribute('class')
             if not class_string: continue
             classes = class_string.split()
@@ -35,60 +36,52 @@ def _collect_articles_from_elements(elements, article_class_pattern, articles_se
             
             page_info_str = ""
 
-            # --- 페이지 정보 추출 로직 시작 (제공된 HTML 예시 기반) ---
+            # --- 페이지 정보 추출 로직 (제공된 HTML 예시 기반) ---
             # Priority 1: <a> 태그를 포함하는 <dt> 태그 내에서 면 정보 찾기
             try:
-                # article_element (<a>)의 부모 <dt> 요소를 찾습니다.
                 parent_dt = article_element.find_element(By.XPATH, "./parent::dt")
-                # 해당 <dt> 요소 내에서 <span class="newspaper_info">를 찾습니다.
                 newspaper_info_span = parent_dt.find_element(By.XPATH, "./span[@class='newspaper_info']")
-                page_text = newspaper_info_span.text.strip() # 예: "A1면" 또는 "A1면 TOP"
-                
-                # 정규표현식으로 "X면" 또는 "AX면" 형태의 정보만 정확히 추출합니다.
+                page_text = newspaper_info_span.text.strip()
                 match = re.search(r"([A-Z]?\d+면)", page_text) 
                 if match:
-                    page_info_str = f"[{match.group(1)}] " # 예: "[A1면] "
+                    page_info_str = f"[{match.group(1)}] "
             except NoSuchElementException:
-                # 해당 구조로 <dt> 내에서 면 정보를 찾지 못한 경우 다음 우선순위로 넘어갑니다.
                 pass 
 
             # Priority 2: <a> 태그를 포함하는 <dt> 태그의 다음 형제 <dd> 태그 내에서 면 정보 찾기
-            if not page_info_str: # 우선순위 1에서 찾지 못한 경우에만 실행
+            if not page_info_str:
                 try:
-                    # article_element (<a>)의 부모 <dt> 요소를 찾습니다.
                     parent_dt = article_element.find_element(By.XPATH, "./parent::dt")
-                    # 해당 <dt> 요소의 바로 다음에 오는 <dd> 요소를 찾습니다.
                     following_dd = parent_dt.find_element(By.XPATH, "./following-sibling::dd[1]")
-                    # 해당 <dd> 요소 내에서 <span class="newspaper_info">를 찾습니다.
-                    # <dd> 안에서는 span이 직접 자식이 아닐 수도 있으므로 .// 사용 가능 (예시에서는 직접 자식)
                     newspaper_info_span = following_dd.find_element(By.XPATH, "./span[@class='newspaper_info']")
                     page_text = newspaper_info_span.text.strip()
-                    
                     match = re.search(r"([A-Z]?\d+면)", page_text)
                     if match:
                         page_info_str = f"[{match.group(1)}] "
                 except NoSuchElementException:
-                    # 해당 구조로 <dd> 내에서 면 정보를 찾지 못한 경우, 정보 없음으로 처리합니다.
                     pass
             # --- 페이지 정보 추출 로직 끝 ---
 
-            # 유효성 검사 및 set에 추가
+            # 유효성 검사
             if title and href and ('news.naver.com' in href or 'n.news.naver.com' in href):
-               modified_title = f"{page_info_str}{title}" # 페이지 정보를 제목 앞에 추가
-               article_tuple = (modified_title, href)
-               if article_tuple not in articles_set:
-                    articles_set.add(article_tuple)
+               modified_title = f"{page_info_str}{title}"
+               
+               # 중복 제거 및 순서대로 리스트에 추가
+               if href not in seen_hrefs_ref: # URL(href)을 기준으로 중복 확인
+                    articles_list_ref.append((modified_title, href)) # 리스트에 추가하여 순서 유지
+                    seen_hrefs_ref.add(href) # 중복 확인을 위해 set에 href 추가
+                    # print(f"  [수집] {modified_title}") # 상세 로그 필요시 주석 해제
                     collected_count += 1
         except StaleElementReferenceException: pass
         except Exception as article_err:
              print(f"  개별 기사 처리 오류: {article_err} - {title[:50] if title else '제목 없음'}")
     return collected_count
 
-# --- 신문사별 크롤링 함수 (crawl_newspaper_articles) ---
-# 이 함수는 _collect_articles_from_elements를 호출하므로 직접적인 변경은 필요하지 않습니다.
-# (기존 crawl_newspaper_articles 함수 코드를 여기에 그대로 유지)
+# --- 신문사별 크롤링 함수 (수정: articles를 list로 변경, seen_hrefs set 추가) ---
 def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
-    articles = set() # (제목, 링크) 튜플 저장
+    articles_ordered_list = []  # 수집된 기사를 순서대로 저장할 리스트
+    seen_article_hrefs = set()  # 이미 수집된 기사의 href를 저장하여 중복 방지
+    
     wait = WebDriverWait(driver, 10)
     article_class_pattern = re.compile(r'^nclicks\(cnt_papaerart\d+\)$')
 
@@ -109,18 +102,20 @@ def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
             is_1men_section = False
             try:
                 elements_selector = f"{content_selector} h4.paper_h4, {content_selector} a[class*='nclicks(cnt_papaerart']"
-                elements = []
+                elements_for_1st_page = [] # 1면 기사 링크 요소만 저장할 리스트
+                
+                # 잠재적 요소들을 먼저 모두 가져옵니다.
+                all_potential_elements = []
                 try:
-                    elements = WebDriverWait(driver, 5).until(
+                    all_potential_elements = WebDriverWait(driver, 5).until(
                         EC.presence_of_all_elements_located((By.CSS_SELECTOR, elements_selector))
                     )
                 except TimeoutException:
                      print(f"1면 스캔: 시간 내 요소를 찾지 못했습니다 ({elements_selector}).")
 
-                print(f"1면 스캔: {len(elements)}개의 잠재적 요소 발견 (h4, a)")
-                front_page_elements = [] 
+                print(f"1면 스캔: {len(all_potential_elements)}개의 잠재적 요소 발견 (h4, a)")
 
-                for element in elements:
+                for element in all_potential_elements:
                     try:
                         tag = element.tag_name
                         if tag == 'h4':
@@ -128,19 +123,21 @@ def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
                             if header_text.endswith("1면"):
                                 print(f"1면 섹션 시작 확인: '{header_text}'")
                                 is_1men_section = True
-                            elif is_1men_section:
+                            elif is_1men_section: # 다른 면으로 넘어갔다고 판단
                                 print(f"1면 섹션 종료 확인: 다음 헤더 '{header_text}' 발견.")
                                 is_1men_section = False
-                                break 
+                                # 1면 섹션이 끝났으므로 더 이상 h4, a 요소를 볼 필요가 없을 수 있음 (페이지 구조에 따라 다름)
+                                # 여기서는 루프를 계속 진행하여 다른 '1면' 섹션이 또 나올 가능성을 대비합니다.
                         elif tag == 'a' and is_1men_section:
-                            # 여기서 element는 <a> 태그이므로 _collect_articles_from_elements로 바로 전달 가능
-                            front_page_elements.append(element) 
+                            elements_for_1st_page.append(element)
                     except StaleElementReferenceException:
-                        print("  처리 중 Stale 발생. 요소 건너뜀.")
+                        print("  처리 중 Stale 발생 (1면 스캔 중). 요소 건너뜀.")
                         continue 
 
-                collected_count = _collect_articles_from_elements(front_page_elements, article_class_pattern, articles)
-                print(f"{newspaper_name} '1면'에서 {collected_count}개의 기사 수집 완료.")
+                # 1면으로 식별된 요소들에 대해서만 기사 수집
+                _collect_articles_from_elements(elements_for_1st_page, article_class_pattern, articles_ordered_list, seen_article_hrefs)
+                print(f"{newspaper_name} '1면'에서 {len(articles_ordered_list)}개의 기사 수집 완료 (중복제거 후).")
+
 
             except Exception as e1:
                 print(f"{newspaper_name} '1면' 수집 중 오류: {e1}")
@@ -175,24 +172,36 @@ def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
                     retries = 3; success = False
                     for attempt in range(retries):
                         try:
+                            # 각 카테고리 버튼을 다시 찾음 (페이지 변경으로 인해 stale 될 수 있으므로)
                             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, category_box_selector)))
                             category_buttons = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, category_button_selector)))
-                            if i >= len(category_buttons): time.sleep(0.5); continue
+                            
+                            if i >= len(category_buttons): # 버튼 개수가 동적으로 변할 경우 방지
+                                print(f"오류: 카테고리 버튼 인덱스 ({i}) 범위를 벗어남. (버튼 수: {len(category_buttons)})")
+                                time.sleep(0.5); continue
 
                             try:
                                 current_category_name = category_buttons[i].text.strip()
                                 if not current_category_name: current_category_name = f"카테고리 {i+1}"
-                            except StaleElementReferenceException: time.sleep(0.5); continue
-                            except Exception: pass
+                            except StaleElementReferenceException: 
+                                print("카테고리 이름 가져오기 실패 (Stale). 재시도...")
+                                time.sleep(0.5); continue
+                            except Exception as name_err:
+                                print(f"카테고리 이름 가져오기 중 기타 오류: {name_err}")
 
-                            if i > 0: 
+
+                            if i > 0: # 첫 번째 카테고리는 이미 로드된 상태일 수 있으므로 클릭하지 않음
                                 button_to_click = category_buttons[i]
                                 try:
+                                    print(f"카테고리 클릭 시도: '{current_category_name}'")
                                     wait.until(EC.element_to_be_clickable(button_to_click))
                                     driver.execute_script("arguments[0].click();", button_to_click)
+                                    # 콘텐츠 영역이 다시 로드되거나, 특정 요소가 나타날 때까지 기다리는 것이 좋음
                                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, content_selector))) 
-                                    time.sleep(random.uniform(0.3, 0.7)) 
-                                except StaleElementReferenceException: time.sleep(0.5); continue
+                                    time.sleep(random.uniform(0.5, 1.0)) # 페이지 로드 대기 시간 추가
+                                except StaleElementReferenceException: 
+                                    print(f"'{current_category_name}' 클릭 시도 중 Stale 발생. 재시도...")
+                                    time.sleep(0.5); continue
                                 except TimeoutException: 
                                     print(f"'{current_category_name}' 클릭 후 콘텐츠 로딩 타임아웃. 다음 시도 또는 카테고리.")
                                     time.sleep(0.5); continue 
@@ -200,28 +209,28 @@ def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
                                     print(f"'{current_category_name}' 클릭 중 오류: {click_err}. 다음 시도 또는 카테고리.")
                                     time.sleep(0.5); continue 
                             else:
-                                print(f"초기 카테고리 처리 중: '{current_category_name}'")
+                                print(f"초기 카테고리 처리 중 (클릭 없음): '{current_category_name}'")
                             
                             print(f"'{current_category_name}' 카테고리 기사 수집 중...")
                             potential_article_links_selector = f"{content_selector} a[class*='nclicks(cnt_papaerart']"
                             potential_elements = []
                             try:
-                                # 현재 카테고리 내의 모든 적합한 링크 요소를 가져옵니다.
                                 potential_elements = WebDriverWait(driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, potential_article_links_selector)))
                             except TimeoutException:
                                 print(f"'{current_category_name}'에서 기사 링크를 시간 내 찾지 못했습니다.")
 
-                            collected_count = _collect_articles_from_elements(potential_elements, article_class_pattern, articles)
-                            print(f"'{current_category_name}' 카테고리에서 {collected_count}개의 새 기사 수집 완료.")
+                            # _collect_articles_from_elements 함수에 articles_ordered_list와 seen_article_hrefs 전달
+                            _collect_articles_from_elements(potential_elements, article_class_pattern, articles_ordered_list, seen_article_hrefs)
+                            print(f"'{current_category_name}' 카테고리에서 추가된 기사 수 확인 (누적: {len(articles_ordered_list)}개).")
                             success = True; break 
                         except StaleElementReferenceException: 
-                            print(f"StaleElementReferenceException 발생 (시도 {attempt+1}/{retries}). 페이지 리프레시 또는 재시도 중...")
+                            print(f"StaleElementReferenceException 발생 (카테고리 루프, 시도 {attempt+1}/{retries}). 재시도 중...")
                             time.sleep(0.5 + attempt * 0.5) 
                         except TimeoutException: 
-                            print(f"TimeoutException 발생 (시도 {attempt+1}/{retries}). 페이지 리프레시 또는 재시도 중...")
+                            print(f"TimeoutException 발생 (카테고리 루프, 시도 {attempt+1}/{retries}). 재시도 중...")
                             time.sleep(0.5 + attempt * 0.5)
                         except Exception as category_err:
-                           print(f"카테고리 처리 중 오류: {category_err}."); success = True; break 
+                           print(f"카테고리 처리 중 기타 오류: {category_err}. 다음 카테고리로 이동 시도."); success = True; break # 심각한 오류 시 해당 카테고리 처리 중단
                     if not success: print(f"!!! 카테고리 '{current_category_name}' 처리 최종 실패.")
             else: 
                 print(f"\n--- {newspaper_name} 첫 페이지만 수집 시도 (카테고리 없음) ---")
@@ -231,20 +240,21 @@ def crawl_newspaper_articles(driver, newspaper_name, oid, crawl_scope="전체"):
                     potential_elements = WebDriverWait(driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, potential_article_links_selector)))
                 except TimeoutException:
                     print(f"첫 페이지에서 기사 링크를 시간 내 찾지 못했습니다.")
+                
+                _collect_articles_from_elements(potential_elements, article_class_pattern, articles_ordered_list, seen_article_hrefs)
+                print(f"첫 페이지에서 추가된 기사 수 확인 (누적: {len(articles_ordered_list)}개).")
 
-                collected_count = _collect_articles_from_elements(potential_elements, article_class_pattern, articles)
-                print(f"첫 페이지에서 {collected_count}개의 새 기사 수집 완료.")
-
-        print(f"\n=== {newspaper_name} 최종 기사 수집 완료 ({len(articles)}개) ===")
-        return list(articles)
+        print(f"\n=== {newspaper_name} 최종 기사 수집 완료 ({len(articles_ordered_list)}개) ===")
+        return articles_ordered_list # set 대신 순서가 유지된 list 반환
 
     except Exception as e:
         print(f"!!! {newspaper_name} 크롤링 중 심각한 오류 발생: {e}")
-        return list(articles) 
+        return articles_ordered_list # 오류 발생 시에도 현재까지 수집된 기사 반환
 
 
 # --- main 함수 ---
-# (기존 main 함수 코드를 여기에 그대로 유지)
+# (main 함수는 변경되지 않았으므로 이전과 동일하게 유지됩니다.
+#  결과를 파일에 쓸 때 articles_ordered_list를 순회하므로 순서대로 저장됩니다.)
 def main():
     # --- 신문사 그룹 정의 ---
     newspaper_groups = {
@@ -300,25 +310,24 @@ def main():
 
     # --- Selenium 설정 ---
     chrome_options = Options()
-    # chrome_options.add_argument("--headless") # 필요시 주석 해제
+    # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    # WebDriver 경로를 시스템 PATH에 설정하거나, 아래와 같이 Service 객체를 사용하세요.
-    # 예: driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    driver = webdriver.Chrome(options=chrome_options) 
+    driver = webdriver.Chrome(options=chrome_options)
 
-    all_articles = {}
+    all_collected_articles_by_newspaper = {} # 결과 저장용 딕셔너리
     try:
         # --- 크롤링 루프 ---
         for name, oid in target_newspapers:
             print(f"\n{'='*10} {name} (oid={oid}) 크롤링 시작 ({crawl_scope} 범위) {'='*10}")
-            articles_list = crawl_newspaper_articles(driver, name, oid, crawl_scope)
-            all_articles[name] = articles_list
-            print(f"{name}에서 수집된 총 기사 수: {len(articles_list)}")
-            time.sleep(random.uniform(1.0, 2.5)) # 서버 부하 감소를 위한 랜덤 지연
+            # crawl_newspaper_articles 함수는 이제 순서가 있는 list를 반환합니다.
+            ordered_articles_for_newspaper = crawl_newspaper_articles(driver, name, oid, crawl_scope)
+            all_collected_articles_by_newspaper[name] = ordered_articles_for_newspaper
+            print(f"{name}에서 수집된 총 기사 수: {len(ordered_articles_for_newspaper)}")
+            time.sleep(random.uniform(1.0, 2.5))
 
         # --- 파일 저장 ---
         now = datetime.datetime.now()
@@ -329,20 +338,21 @@ def main():
                 f.write(f"네이버 뉴스 '{group_name}' 그룹 '{crawl_scope}' 범위 크롤링 결과\n")
                 f.write(f"생성 시간: {now.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write("="*50 + "\n\n")
-                if not all_articles:
+                if not all_collected_articles_by_newspaper:
                     f.write("수집된 신문사가 없습니다.\n")
                 else:
-                    for newspaper_name_from_dict, article_tuples in all_articles.items():
-                        f.write(f"--- {newspaper_name_from_dict} ({len(article_tuples)}개) ---\n\n")
-                        if not article_tuples:
+                    for newspaper_name_key, article_tuples_list in all_collected_articles_by_newspaper.items():
+                        f.write(f"--- {newspaper_name_key} ({len(article_tuples_list)}개) ---\n\n")
+                        if not article_tuples_list:
                             f.write("수집된 기사가 없습니다.\n\n")
                         else:
-                            for idx, (title_text, link_url) in enumerate(article_tuples, 1): 
-                                f.write(f"{idx}. 제목: {title_text}\n") 
+                            # article_tuples_list는 이미 순서가 유지된 리스트입니다.
+                            for idx, (title_text, link_url) in enumerate(article_tuples_list, 1):
+                                f.write(f"{idx}. 제목: {title_text}\n")
                                 f.write(f"   링크: {link_url}\n\n")
                         f.write("-" * 50 + "\n\n")
             print(f"결과를 '{filename}' 파일에 성공적으로 저장했습니다.")
-        except Exception as e_file: 
+        except Exception as e_file:
             print(f"파일 저장 중 오류 발생: {e_file}")
 
     finally:
