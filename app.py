@@ -3,10 +3,13 @@ from news.newsbrief_all import crawl_newspaper_articles
 from config import newspaper_groups
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import datetime
 import random
 import time
 import json
+import os
 
 app = Flask(__name__)
 
@@ -18,11 +21,18 @@ def setup_chrome_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless")  # Run in headless mode
     chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--no-sandbox")  # Required for some Linux environments
+    chrome_options.add_argument("--disable-dev-shm-usage")  # Required for some Linux environments
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    return webdriver.Chrome(options=chrome_options)
+    
+    # Create results directory if it doesn't exist
+    if not os.path.exists('results'):
+        os.makedirs('results')
+    
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 @app.route('/')
 def index():
@@ -55,7 +65,7 @@ def crawl():
         
         # Generate filename
         now = datetime.datetime.now()
-        filename = f"신문기사_{now.strftime('%Y%m%d_%H%M%S')}.txt"
+        filename = f"results/신문기사_{now.strftime('%Y%m%d_%H%M%S')}.txt"
         
         # Save results to file
         with open(filename, "w", encoding="utf-8") as f:
@@ -70,7 +80,7 @@ def crawl():
                         f.write("수집된 기사가 없습니다.\n\n")
                     else:
                         for title, link in article_tuples:
-                            f.write(f" 🔹 {title}\n")
+                            f.write(f"🔹 {title}\n")
                     f.write("\n")
         
         return jsonify({
@@ -85,4 +95,5 @@ def crawl():
         driver.quit()
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
